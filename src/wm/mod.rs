@@ -1,4 +1,2 @@
-pub mod window_manager;
-pub mod sway;
-pub mod hypr;
 pub mod util;
+pub mod window_manager;
