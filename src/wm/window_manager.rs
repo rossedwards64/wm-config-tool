@@ -4,28 +4,32 @@ use crate::wm::util;
 
 pub struct WindowManager {
     config_path: PathBuf,
-    command_stmt_start: String,
-    command_stmt_split: String,
+    var_stmt_start: String,
+    bind_stmt_start: String,
+    cmd_stmt_split: String,
     variables: HashMap<String, String>,
     keybinds: HashMap<String, String>,
 }
 
 impl WindowManager {
-    // hypr: variables start with $, binds start with bind*
-    // split on '='
-    // sway: variables start with set, binds start with bindsym
-    // split on ' '
-    pub fn new(config_path: &str, command_stmt_start: &str, command_stmt_split: &str) -> Self {
+    pub fn new(
+        config_path: &str,
+        var_stmt_start: &str,
+        bind_stmt_start: &str,
+        cmd_stmt_split: &str,
+    ) -> Self {
         let config_path = dirs::config_dir()
             .unwrap_or_else(|| panic!("Config file does not exist!"))
             .join(config_path);
-        let command_stmt_start = command_stmt_start.to_string();
-        let command_stmt_split = command_stmt_split.to_string();
+        let var_stmt_start = var_stmt_start.to_string();
+        let bind_stmt_start = bind_stmt_start.to_string();
+        let cmd_stmt_split = cmd_stmt_split.to_string();
 
         Self {
             config_path,
-            command_stmt_start,
-            command_stmt_split,
+            var_stmt_start,
+            bind_stmt_start,
+            cmd_stmt_split,
             variables: HashMap::new(),
             keybinds: HashMap::new(),
         }
@@ -36,14 +40,38 @@ impl WindowManager {
         reader
             .lines()
             .map(util::get_line)
-            .filter(|s| s.starts_with(&self.command_stmt_start))
+            .filter(|s| s.starts_with(&self.var_stmt_start))
             .for_each(|mut l| {
-                let (_, variable) = l.split_at_mut(self.command_stmt_start.len());
-                match variable.split_once(&self.command_stmt_split) {
-                    Some((key, value)) => self.variables.insert(key.to_string(), value.to_string()),
-                    None => panic!("Could not get variable from line."),
-                };
+                util::get_key_value_from_line(
+                    &mut l,
+                    &self.var_stmt_start,
+                    &self.cmd_stmt_split,
+                    &mut self.variables,
+                );
             });
         &self.variables
+    }
+
+    /* TODO: parsing hypr keybinds takes a bit more fenagling.
+     *       after bind=, the modifier, key, action and command are
+     *       separated by a delimiter.
+     *       there are several possible characters that can be used;
+     *       when parsing find out what the first delimiter is and
+     *       use it for the rest of the line */
+    pub fn read_bindings(&mut self) -> &HashMap<String, String> {
+        let reader = util::get_reader_from_path(&self.config_path);
+        reader
+            .lines()
+            .map(util::get_line)
+            .filter(|s| s.starts_with(&self.bind_stmt_start))
+            .for_each(|mut l| {
+                util::get_key_value_from_line(
+                    &mut l,
+                    &self.bind_stmt_start,
+                    &self.cmd_stmt_split,
+                    &mut self.keybinds,
+                );
+            });
+        &self.keybinds
     }
 }
